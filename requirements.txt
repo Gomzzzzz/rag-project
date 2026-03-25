@@ -9,4 +9,7 @@ sentence-transformers
 transformers
 torch
 accelerate
+fastapi
+uvicorn
+
 
