@@ -15,3 +15,4 @@ def health():
 def query(q: str):
     results = rag.query(q)
     return {"query": q, "results": results}
+
