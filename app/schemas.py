@@ -15,3 +15,9 @@ class RetrievalResult(BaseModel):
 class QueryResponse(BaseModel):
     query: str
     results: List[RetrievalResult]
+
+
+class AnswerResponse(BaseModel):
+    query: str
+    answer: str
+    context: List[RetrievalResult]

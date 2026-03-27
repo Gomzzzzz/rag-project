@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.rag import RAGPipeline
-from app.schemas import QueryRequest, QueryResponse
+from app.schemas import QueryRequest, QueryResponse, AnswerResponse
 
 app = FastAPI(title="RAG API", version="0.1.0")
 
@@ -24,4 +24,14 @@ def query_post(request: QueryRequest):
     return {
         "query": request.question,
         "results": results,
+    }
+
+@app.post("/answer", response_model=AnswerResponse)
+def answer(request: QueryRequest):
+    result = rag.generate_answer(request.question, k=request.k)
+
+    return {
+        "query": request.question,
+        "answer": result["answer"],
+        "context": result["context"],
     }

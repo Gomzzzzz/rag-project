@@ -36,6 +36,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from transformers import pipeline
 
 
 class RAGPipeline:
@@ -46,10 +47,13 @@ class RAGPipeline:
     ):
         self.pdf_path = pdf_path
         self.index_path = index_path
+
+        # Embedding model for retrieval
         self.embeddings = HuggingFaceEmbeddings(
             model_name="all-MiniLM-L6-v2"
         )
 
+        # Load existing FAISS index if present already, otherwise build and save it
         if Path(self.index_path).exists():
             self.vectorstore = self._load_vectorstore()
             print("Loaded existing FAISS index from disk.")
@@ -57,6 +61,13 @@ class RAGPipeline:
             self.vectorstore = self._build_vectorstore()
             self._save_vectorstore()
             print("Built and saved new FAISS index.")
+
+        # Generation model for answer creation
+        self.generator = pipeline(
+            "text-generation",
+            model="distilgpt2",
+            max_new_tokens=120,
+        )
 
     def _build_vectorstore(self):
         loader = PyPDFLoader(self.pdf_path)
@@ -88,9 +99,38 @@ class RAGPipeline:
         return [
             {
                 "content": doc.page_content,
-                "metadata": {"source":doc.metadata.get("source"),
-		"page": doc.metadata.get("page"),
-		"page_label": doc.metadata.get("page_label"),},
+                "metadata": {
+                    "source": doc.metadata.get("source"),
+                    "page": doc.metadata.get("page"),
+                    "page_label": doc.metadata.get("page_label"),
+                },
             }
             for doc in docs
         ]
+
+    def generate_answer(self, question: str, k: int = 5):
+        docs = self.query(question, k=k)
+        context = "\n\n".join([doc["content"] for doc in docs])
+
+        prompt = f"""Answer the question based only on the context below.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer:"""
+
+        result = self.generator(prompt)
+        full_text = result[0]["generated_text"]
+
+        # Try to strip the prompt back out if the model echoes it
+        answer = full_text.replace(prompt, "").strip()
+        if not answer:
+            answer = full_text.strip()
+
+        return {
+            "answer": answer,
+            "context": docs,
+        }
